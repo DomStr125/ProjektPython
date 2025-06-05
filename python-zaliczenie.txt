@@ -1,0 +1,73 @@
+Gra "Labirynt"
+
+-> losowe generowanie labiryntu
+	algorytm losowania labiryntu
+-> rozmiar zależny od poziomu trudności
+-> sterowanie (w/s/a/d)
+-> interakcje z przedmiotami i przeszkodami
+-> system pułapek i przeszkód
+	cofające do startu
+	ruchome przeszkody (np. przesuwające się ściany co kilka ruchów)
+	znikające podłogi (po wejściu na pole)
+-> system kluczy i drzwi
+	kolory kluczy i drzwi
+	ograniczona liczba kluczy
+-> poziomy trudności
+	łatwy (mały labirynt)
+	średni (większy labirynt, pułapki)
+	trudny (bardzo duży labirynt, pułapki, ograniczona widoczność, gra na czas)
+-> tryb na czas
+	odliczanie czasu od rozpoczęcia gry
+	rekordy
+-> plecak gracza
+	zbieranie przedmiotów
+	ograniczona liczba miejsc
+-> zapis i odczyt stanu gry
+-> wielokrotny labirynt (np. kampania złożona z trzech poziomów)
+-> system NPC
+	patroluje
+	ściga gracza po zauważeniu (lub inna akcja)
+->mapa i mgła
+	ograniczona widoczność (np. 5 pól od gracza)
+	odkrywanie mapy w miarę postępów
+-> punktacja
+	punkty za np. czas gry, liczba kluczy itp.
+->wielopoziomowy labirynt
+	płaszczyzna pozioma i pionowa
+-> mgła
+	odsłanianie części labiryntu zamiast całego
+
+
+
+
+
+-> plan gry
+
+KAMPANIA:
+	-> las labirynt:
+		-> mgła !
+		-> klucze + drzwi !
+		-> pochodnia !
+		-> przeciwnicy(co kilka tur (lub sekund) wyskakuje na jednym miejscu) !
+	-> pustynia labirynt:
+		-> burza piaskowa (zmiania układu labiryntu co 3 ruchy, gracz zawsze stoi na ścieże, zawsze ma możliwość dodarcia do mety)
+		-> ruchome piaski (poruszanie sie po jednym polu zajmuje 2 tury)
+		-> sępy (przciwnicy AI z określoną szybkością i polem widzenia)
+		-> system dnia i nocy (w nocy ograniczona widoczność gracza i wrogów) MEDIUM (day: 0.75 / night: 0.25) HARD (day/night: 0.5) - stosunek tur (np. 30 tur dnia i 10 nocy dla medium)
+			-> HARD - większa liczba przeciwników / zwiekszenie ich statystyk (np. szybkość)
+		-> przedmioty specjalne: pochodnia / buty (ruchome piaski działają jak zwykłe ścieżki)
+	-> góry:
+		-> wielopoziomowość (np. schody, dookoła skała - można się tylko zsunąć "w dół") + (obrażenia za upadek z wysokości) 
+		-> lawiny (co kilka tur na losowo wybrane (1 raz) pola spada lawina) 
+		-> erupcje wulkanu (co kilka tur na losowe pola spada meteor (2x2)) 
+		-> zapadające skały(po zejściu z pola pole sie zapada) 
+		-> przedmiot specjalny: lotnia (w miejscach, gdzie wcześniej zapadła się półka można się poruszać + brak obrażeń z upadku z wysokości), most
+	-> wieża:
+		-> zapadająca się podłoga 
+		-> ciemność (widoczność: 2)
+		-> wrogowie (przeciwnicy AI) 
+		-> drwzi i klucze
+		-> przyciski
+		-> tajne przejścia w dwie/jedną strone 
+		-> przedmiot specjalny: pochodnia / latarnia (zwiększa pole widzenia o 5)
+		-> piętra (labirynt składa się z kilku mniejszych, ilość zależy od poziomu trudności)
