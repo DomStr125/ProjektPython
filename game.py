@@ -414,7 +414,7 @@ class LabirynthGame:
             self.points += self.hearts * 250
             messagebox.showinfo("Congratulations!", f"You've reached the exit in {final_time}s \n Your score: {self.points}")
             # otwarcie nowego poziomu
-            subprocess.Popen([sys.executable, "level2.py", str(self.hearts), self.difficulty])
+            subprocess.Popen([sys.executable, "desert.py", str(self.hearts), self.difficulty])
             self.root.quit()
 
         # logika bramy i klucza do bramy
