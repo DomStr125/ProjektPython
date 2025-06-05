@@ -4,6 +4,8 @@ import tkinter as tk
 from tkinter import messagebox
 from collections import deque
 import pickle
+import subprocess
+import sys
 
 class LabirynthGame:
 
@@ -243,7 +245,7 @@ class LabirynthGame:
                     elif (x, y) == (self.player_x, self.player_y):
                         self.canvas.create_image(x * self.cell_size, y * self.cell_size, anchor=tk.NW, image=self.textures["player"])
                     elif isinstance(cell, str) and cell.startswith("K"):
-                        # Draw key based on its type
+                        # narysowanie klucza na podstawie jego typu
                         key_textures = {
                             "K1": "ruby_key",
                             "K2": "amber_key",
@@ -254,7 +256,7 @@ class LabirynthGame:
                         texture = self.textures.get(key_textures.get(cell, "ruby_key"))
                         self.canvas.create_image(x * self.cell_size, y * self.cell_size, anchor=tk.NW, image=texture)
                     elif isinstance(cell, str) and cell.startswith("D"):
-                        # Draw door based on its type
+                        # narysowanie drzwi na podstawie ich typu
                         door_textures = {
                             "D1": "ruby_door",
                             "D2": "amber_door",
@@ -278,7 +280,7 @@ class LabirynthGame:
                     self.canvas.create_image(x * self.cell_size, y * self.cell_size, anchor=tk.NW, image=self.textures["fog"])
 
     def on_key_press(self, event): # obsługa klawiszy
-        # Show inventory on 'e' key
+        # pokazanie ekwipunku
         if event.keysym.lower() == "e":
             keys_display = ", ".join(self.keys) if self.keys else "None"
             specials_display = ", ".join(self.inventory["special_items"]) if self.inventory["special_items"] else "None"
@@ -317,11 +319,11 @@ class LabirynthGame:
 
         if 0 <= new_x < self.width and 0 <= new_y < self.height: #blokada ścian
             cell = self.labirynth[new_y][new_x]
-            # Check for door
+            # sprawdzenie drzwi
             if isinstance(cell, str) and cell.startswith("D"):
                 key_type = "K" + cell[1:]  # e.g. D2 -> K2
                 if key_type in self.keys:
-                    # Open the door
+                    # otwórz drzwi
                     self.labirynth[new_y][new_x] = 0
                     self.keys.remove(key_type)
                     self.points += 200
@@ -330,7 +332,7 @@ class LabirynthGame:
                     self.player_x, self.player_y = new_x, new_y
                 else:
                     print(f"You need key {key_type} to open this door!")
-                    # Don't move
+                    # stoj
             elif cell != 1:
                 self.player_x, self.player_y = new_x, new_y
 
@@ -347,7 +349,7 @@ class LabirynthGame:
                     self.labirynth[y][x] = "GRASS"
                 self.grass_monsters.clear()
 
-        # Monster visibility logic
+        # potwory logika
         if not hasattr(self, "monsters_are_visible"):
             self.monsters_are_visible = False
             self.monster_hidden_turns = 3
@@ -356,31 +358,31 @@ class LabirynthGame:
         if self.monsters_are_visible:
             self.monster_visible_turns -= 1
             if self.monster_visible_turns <= 0:
-                # Hide monsters
+                # chowaj potwory
                 for (x, y) in self.enemies:
                     self.labirynth[y][x] = "GRASS"
                 self.grass_monsters.clear()
                 self.monsters_are_visible = False
-                self.monster_hidden_turns = 3  # Hide for 3 turns
+                self.monster_hidden_turns = 3  # chowaj na 3 tury
         else:
             self.monster_hidden_turns -= 1
             if self.monster_hidden_turns <= 0:
-                # Show monsters
+                # pokaż potwory
                 self.grass_monsters = set(self.enemies)
                 for (x, y) in self.enemies:
                     self.labirynth[y][x] = "GRASS_MONSTER"
                 self.monsters_are_visible = True
-                self.monster_visible_turns = 2  # Show for 2 turns
+                self.monster_visible_turns = 2  # pokaż na 2 tury
 
         self.draw_labirynth()
 
-        # Check for key collection
+        # zbieranie kluczy
         cell = self.labirynth[self.player_y][self.player_x]
         if isinstance(cell, str) and cell.startswith("K"):
             if cell not in self.keys:
                 if len(self.keys) >= self.max_keys and self.max_keys > 0:
                     removed_key = self.keys.pop(0)
-                    # Place the removed key at the current position
+                    # zastąpienie klucza w labiryncie
                     self.labirynth[self.player_y][self.player_x] = removed_key
                     print(f"Inventory full! Dropped oldest key: {removed_key} and picked up {cell}")
                 elif self.max_keys == 0:
@@ -390,11 +392,11 @@ class LabirynthGame:
                     self.labirynth[self.player_y][self.player_x] = 0
                     print(f"You found key {cell}!")
                 self.keys.append(cell)
-                # Only clear the cell if we didn't just drop a key there
+                # tylko jeśli klucz nie jest już w ekwipunku
                 if self.labirynth[self.player_y][self.player_x] == cell:
                     self.labirynth[self.player_y][self.player_x] = 0
 
-        # Torch collection
+        # zbiewranie pochodni
         if (self.player_x, self.player_y) == (self.torch_x, self.torch_y):
             self.labirynth[self.torch_y][self.torch_x] = 0
             self.torch_x, self.torch_y = -1, -1
@@ -405,15 +407,17 @@ class LabirynthGame:
             self.inventory["special_items"].append("torch")
             self.draw_labirynth()
 
-        # Exit
+        # wyjscie
         if (self.player_x, self.player_y) == (self.exit_x, self.exit_y):
             self.is_game_active = False
             final_time = int(time.time() - self.start_time)
             self.points += self.hearts * 250
             messagebox.showinfo("Congratulations!", f"You've reached the exit in {final_time}s \n Your score: {self.points}")
+            # otwarcie nowego poziomu
+            subprocess.Popen([sys.executable, "level2.py", str(self.hearts), self.difficulty])
             self.root.quit()
 
-        # Gate logic (unchanged)
+        # logika bramy i klucza do bramy
         if (self.player_x, self.player_y) == (self.gate_x, self.gate_y):
             if self.inventory["Gate Key"] == 1:
                 self.labirynth[self.gate_y][self.gate_x] = 0
@@ -500,11 +504,11 @@ class LabirynthGame:
             self.keys_pos.append(key_pos)
             self.labirynth[key_pos[1]][key_pos[0]] = f"K{i+1}"
 
-            # Find path from player to key and key to exit
+            # droga od gracza do klucza i od klucza do wyjścia
             path_to_key = self.find_path(self.player_x, self.player_y, key_pos[0], key_pos[1])
             path_key_to_exit = self.find_path(key_pos[0], key_pos[1], self.exit_x, self.exit_y)
 
-            # Place door only on path from key to exit, not blocking player to key
+            # Umieść drzwi tylko na ścieżce od klucza do wyjścia, nie blokując ścieżki od gracza do klucza
             possible_door_positions = [
                 pos for pos in path_key_to_exit[1:-1]
                 if pos not in path_to_key and pos not in self.doors and pos not in self.keys_pos
@@ -611,7 +615,7 @@ class LabirynthGame:
             self.gate_key_x, self.gate_key_y = -1, -1
 
     def show_minimap(self): # wyświetlanie minimapy
-        # If minimap already open, bring it to front and return
+        # Jeśli minimapa jest już otwarta, przynieś ją na wierzch i wróć
         if self.minimap_window is not None and tk.Toplevel.winfo_exists(self.minimap_window):
             self.minimap_window.lift()
             self.minimap_window.focus_force()
@@ -620,27 +624,27 @@ class LabirynthGame:
         self.minimap_window = tk.Toplevel(self.root)
         self.minimap_window.title("Minimap")
         self.minimap_window.protocol("WM_DELETE_WINDOW", lambda: self.close_minimap())
-        cell_size = 8  # Small cells for minimap
+        cell_size = 8  # mały rozmiar komórki minimapy
         canvas = tk.Canvas(self.minimap_window, width=self.width*cell_size, height=self.height*cell_size, bg="white")
         canvas.pack()
 
         for y in range(self.height):
             for x in range(self.width):
                 if not self.discovered[y][x]:
-                    color = "blue"  # Unknown
+                    color = "blue"  # nieodkryta komórka
                 elif (x, y) == (self.exit_x, self.exit_y):
-                    color = "green"  # Exit
+                    color = "green"  # wwyjście
                 elif isinstance(self.labirynth[y][x], str) and self.labirynth[y][x].startswith("K"):
-                    color = "yellow"  # Key
+                    color = "yellow"  # Klucz
                 elif self.labirynth[y][x] == 1:
-                    color = "black"  # Wall
+                    color = "black"  # Ściana
                 else:
-                    color = "white"  # Path
+                    color = "white"  # Ścieżka
                 canvas.create_rectangle(
                     x*cell_size, y*cell_size, (x+1)*cell_size, (y+1)*cell_size,
                     fill=color, outline=""
                 )
-        # Mark player position
+        # narysowanie gracza na minimapie
         canvas.create_rectangle(
             self.player_x*cell_size, self.player_y*cell_size,
             (self.player_x+1)*cell_size, (self.player_y+1)*cell_size,
@@ -674,7 +678,7 @@ class LabirynthGame:
                     possible.pop(idx)
                     break
 
-    def save_game(self, filename="savegame.pkl"):
+    def save_game(self, filename="savegame.pkl"): # zapisywanie stanu gry
         state = {
             "labirynth": self.labirynth,
             "player_x": self.player_x,
@@ -711,7 +715,7 @@ class LabirynthGame:
             pickle.dump(state, f)
         messagebox.showinfo("Game Saved", "Your game has been saved!")
 
-    def load_game(self, filename="savegame.pkl"):
+    def load_game(self, filename="savegame.pkl"): # ładowanie stanu gry
         with open(filename, "rb") as f:
             state = pickle.load(f)
         self.labirynth = state["labirynth"]
@@ -765,7 +769,7 @@ class LabirynthGame:
 
         def load_and_start():
             root.deiconify()
-            game = LabirynthGame(root, "easy")  # Difficulty will be overwritten by save
+            game = LabirynthGame(root, "easy")  # domyślny poziom trudności
             game.load_game()
 
         tk.Button(dialog, text="Easy", command=lambda: start_and_close("easy")).pack(fill=tk.X, padx=20, pady=5)
