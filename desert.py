@@ -1,7 +1,9 @@
 import sys
 import tkinter as tk
+from tkinter import messagebox
 import random
 import time
+from collections import deque
 
 class Desert:
 
@@ -11,27 +13,36 @@ class Desert:
             "height": 15,
             "vision": 5,
             "enemies": 5,
+            "enemy_speed": 1,
+            "enemy_vision": 3,
             "day_turns": 20,
             "night_turns": 0,
-            "shift": 10
+            "shift": 10,
+            "quick_sand": 0.1
         },
         "medium": {
             "width": 40,
             "height": 20,
             "vision": 4,
             "enemies": 10,
+            "enemy_speed": 1,
+            "enemy_vision": 5,
             "day_turns": 15,
             "night_turns": 5,
-            "shift": 8
+            "shift": 8,
+            "quick_sand": 0.2
         },
         "hard": {
             "width": 50,
             "height": 25,
             "vision": 3,
             "enemies": 15,
+            "enemy_speed": 2,
+            "enemy_vision": 5,
             "day_turns": 10,
             "night_turns": 10,
-            "shift": 6
+            "shift": 6,
+            "quick_sand": 0.3
         }
     }
 
@@ -39,12 +50,13 @@ class Desert:
         self.root = root
         self.hearts = hearts
         self.difficulty = difficulty
+        self.in_quick_sand = False
         self.settings = self.DIFFICULTY[difficulty]
         self.width = self.settings["width"]
         self.height = self.settings["height"]
         self.vision = self.settings["vision"]
         self.enemies = self.settings["enemies"]
-        self.cell_size = 20
+        self.cell_size = 32
         self.turns = 0
         
         self.points = 5000
@@ -76,6 +88,9 @@ class Desert:
         self.textures = self.load_textures()
 
         self.generate_labirynth()  # Generate the labyrinth on startup
+        self.draw_labirynth()
+
+        self.root.bind("<KeyPress>", self.on_key_press)
 
     def load_textures(self):
         textures = {
@@ -86,7 +101,8 @@ class Desert:
             "sandals": tk.PhotoImage(file="grafika/desert/sandals.png"),
             "darkness": tk.PhotoImage(file="grafika/desert/darkness.png"),
             "quick_sand": tk.PhotoImage(file="grafika/desert/quick_sand.png"),
-            "tornado": tk.PhotoImage(file="grafika/desert/tornado.png")
+            "tornado": tk.PhotoImage(file="grafika/desert/tornado.png"),
+            "exit": tk.PhotoImage(file="grafika/exit.png")
         }
         return textures
 
@@ -100,38 +116,118 @@ class Desert:
 
                 self.root.after(1000, self.setup_scores)
     
-    def generate_labirynth(self): # generowanie labiryntu
-        # 1 = wall, 0 = sand
+    def generate_labirynth(self):
+        # 1 = rock (border), 0 = sand (path), 2 = tornado (wall)
         labirynth = [[1 for _ in range(self.width)] for _ in range(self.height)]
 
-        # Set interior to sand
-        for y in range(1, self.height - 1):
-            for x in range(1, self.width - 1):
-                labirynth[y][x] = 0
+        # Maze generation using DFS
+        def carve(x, y):
+            dirs = [(2,0), (-2,0), (0,2), (0,-2)]
+            random.shuffle(dirs)
+            for dx, dy in dirs:
+                nx, ny = x + dx, y + dy
+                if 1 <= nx < self.width-1 and 1 <= ny < self.height-1 and labirynth[ny][nx] == 1:
+                    labirynth[ny][nx] = 0
+                    labirynth[y + dy//2][x + dx//2] = 0
+                    carve(nx, ny)
 
-        # Place player in top-right (not on the border)
-        self.player_x, self.player_y = self.width - 2, 1
+        # Fill interior with walls (1)
+        for y in range(1, self.height-1):
+            for x in range(1, self.width-1):
+                labirynth[y][x] = 1
+
+        labirynth[1][1] = 0  # player start
+        carve(1, 1)
+
+        # Ensure exit is open and connected
+        ex, ey = self.width-2, self.height-2
+        if labirynth[ey][ex] != 0:
+            # Find a neighbor that is open and connect
+            for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
+                nx, ny = ex+dx, ey+dy
+                if 1 <= nx < self.width-1 and 1 <= ny < self.height-1 and labirynth[ny][nx] == 0:
+                    labirynth[ey][ex] = 0
+                    break
+            else:
+                # If no neighbor is open, forcibly open a path
+                labirynth[ey][ex] = 0
+                labirynth[ey][ex-1] = 0
+
+        # Now convert all remaining 1s (walls) to 2 (tornado)
+        for y in range(1, self.height-1):
+            for x in range(1, self.width-1):
+                if labirynth[y][x] == 1:
+                    labirynth[y][x] = 2
+
+        self.player_x, self.player_y = 1, 1
+        self.exit_x, self.exit_y = ex, ey
         labirynth[self.player_y][self.player_x] = "P"
-
-        # Place exit in bottom-left (not on the border)
-        self.exit_x, self.exit_y = 1, self.height - 2
         labirynth[self.exit_y][self.exit_x] = "E"
-
-        # Optionally: randomly add some walls inside (not on player or exit)
-        for _ in range((self.width * self.height) // 6):  # adjust density as needed
+        
+        # Place quick sand randomly (avoid player and exit)
+        num_quick_sand = int(self.settings["quick_sand"] * self.width * self.height)
+        placed = 0
+        while placed < num_quick_sand:
             x = random.randint(1, self.width - 2)
             y = random.randint(1, self.height - 2)
-            if (x, y) not in [(self.player_x, self.player_y), (self.exit_x, self.exit_y)]:
-                labirynth[y][x] = 1
+            if labirynth[y][x] == 0 and (x, y) not in [(self.player_x, self.player_y), (self.exit_x, self.exit_y)]:
+                labirynth[y][x] = 3  # 3 = quick sand
+                placed += 1
 
         self.labirynth = labirynth
 
     def tornado_shift(self):
-        # Randomize interior walls (not border, not player, not exit)
-        for y in range(1, self.height - 1):
-            for x in range(1, self.width - 1):
-                if (x, y) not in [(self.player_x, self.player_y), (self.exit_x, self.exit_y)]:
-                    self.labirynth[y][x] = 1 if random.random() < 0.18 else 0  # 18% wall, adjust as needed
+        # 1. Find the current shortest path
+        path = self.find_shortest_path()
+        if not path:
+            return  # Should not happen, but safety
+
+        # 2. Regenerate a new maze
+        labirynth = [[1 for _ in range(self.width)] for _ in range(self.height)]
+        def carve(x, y):
+            dirs = [(2,0), (-2,0), (0,2), (0,-2)]
+            random.shuffle(dirs)
+            for dx, dy in dirs:
+                nx, ny = x + dx, y + dy
+                if 1 <= nx < self.width-1 and 1 <= ny < self.height-1 and labirynth[ny][nx] == 1:
+                    labirynth[ny][nx] = 0
+                    labirynth[y + dy//2][x + dx//2] = 0
+                    carve(nx, ny)
+        for y in range(1, self.height-1):
+            for x in range(1, self.width-1):
+                labirynth[y][x] = 1
+        carve(self.player_x, self.player_y)
+        ex, ey = self.exit_x, self.exit_y
+        if labirynth[ey][ex] != 0:
+            for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
+                nx, ny = ex+dx, ey+dy
+                if 1 <= nx < self.width-1 and 1 <= ny < self.height-1 and labirynth[ny][nx] == 0:
+                    labirynth[ey][ex] = 0
+                    break
+            else:
+                labirynth[ey][ex] = 0
+                labirynth[ey][ex-1] = 0
+        # Convert all remaining 1s to 2 (tornado)
+        for y in range(1, self.height-1):
+            for x in range(1, self.width-1):
+                if labirynth[y][x] == 1:
+                    labirynth[y][x] = 2
+        # Restore player and exit
+        labirynth[self.player_y][self.player_x] = "P"
+        labirynth[self.exit_y][self.exit_x] = "E"
+
+        # --- RE-PLACE QUICKSAND ---
+        num_quick_sand = int(self.settings["quick_sand"] * self.width * self.height)
+        placed = 0
+        while placed < num_quick_sand:
+            x = random.randint(1, self.width - 2)
+            y = random.randint(1, self.height - 2)
+            if labirynth[y][x] == 0 and (x, y) not in [(self.player_x, self.player_y), (self.exit_x, self.exit_y)]:
+                labirynth[y][x] = 3  # 3 = quick sand
+                placed += 1
+        # --------------------------
+
+        self.labirynth = labirynth
 
     def next_turn(self):
         # Call this every player move
@@ -141,11 +237,10 @@ class Desert:
             self.draw_labirynth()
     
     def draw_labirynth(self):
-        self.canvas = getattr(self, "canvas", None)
-        if self.canvas is None:
+        # Create canvas if it doesn't exist
+        if not hasattr(self, "canvas") or self.canvas is None:
             self.canvas = tk.Canvas(self.root, width=self.width * self.cell_size, height=self.height * self.cell_size, bg="white")
             self.canvas.pack(expand=True, fill=tk.BOTH)
-            self.canvas.lower()  # keep under UI
 
         self.canvas.delete("all")
         for y in range(self.height):
@@ -153,7 +248,11 @@ class Desert:
                 cell = self.labirynth[y][x]
                 px, py = x * self.cell_size, y * self.cell_size
                 if cell == 1:
-                    self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["wall"])
+                    self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["wall"])  # rock border
+                elif cell == 2:
+                    self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["tornado"])  # tornado inside
+                elif cell == 3:
+                    self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["quick_sand"])  # quick sand
                 elif cell == 0:
                     self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["sand"])
                 elif cell == "P":
@@ -161,18 +260,94 @@ class Desert:
                     self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["player"])
                 elif cell == "E":
                     self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["sand"])
-                    self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["enemy"])  # or use exit texture if you have one
+                    # Use an exit texture if you have one, otherwise fallback to enemy
+                    exit_img = self.textures.get("exit", self.textures["enemy"])
+                    self.canvas.create_image(px, py, anchor=tk.NW, image=exit_img)
 
-        # Optionally: draw other objects (enemies, items, etc.) here
+    def on_key_press(self, event):
+        if self.in_quick_sand:
+            # Skip this turn, but allow the player to move next turn
+            self.in_quick_sand = False
+            self.next_turn()
+            self.draw_labirynth()
+            return
 
+        dx, dy = 0, 0
+        if event.keysym == "Up":
+            dy = -1
+        elif event.keysym == "Down":
+            dy = 1
+        elif event.keysym == "Left":
+            dx = -1
+        elif event.keysym == "Right":
+            dx = 1
+        else:
+            return  # Ignore other keys
+
+        new_x = self.player_x + dx
+        new_y = self.player_y + dy
+
+        # Check bounds and collisions (can't move into rocks or tornado)
+        if (0 < new_x < self.width - 1 and 0 < new_y < self.height - 1 and
+            self.labirynth[new_y][new_x] != 1 and self.labirynth[new_y][new_x] != 2):
+            # Check if stepping on quick sand BEFORE moving
+            stepping_on_quicksand = self.labirynth[new_y][new_x] == 3
+
+            # Move player
+            self.labirynth[self.player_y][self.player_x] = 0  # Clear old position
+            self.player_x, self.player_y = new_x, new_y
+            self.labirynth[self.player_y][self.player_x] = "P"
+            self.next_turn()  # Handle tornado shift if needed
+            self.draw_labirynth()
+
+            # If stepped on quick sand, set flag to skip next move
+            if stepping_on_quicksand:
+                self.in_quick_sand = True
+
+            # Check for exit
+            if (self.player_x, self.player_y) == (self.exit_x, self.exit_y):
+                self.is_game_active = False
+                final_time = int(time.time() - self.start_time)
+                self.points += self.hearts * 250
+                messagebox.showinfo("Congratulations!", f"You've reached the exit in {final_time}s \n Your score: {self.points}")
+                self.root.after(100, self.root.destroy)
+
+    def find_shortest_path(self):
+        queue = deque()
+        queue.append((self.player_x, self.player_y))
+        visited = [[False]*self.width for _ in range(self.height)]
+        prev = [[None]*self.width for _ in range(self.height)]
+        visited[self.player_y][self.player_x] = True
+
+        while queue:
+            x, y = queue.popleft()
+            if (x, y) == (self.exit_x, self.exit_y):
+                # Reconstruct path
+                path = []
+                while (x, y) != (self.player_x, self.player_y):
+                    path.append((x, y))
+                    x, y = prev[y][x]
+                path.append((self.player_x, self.player_y))
+                path.reverse()
+                return path
+            for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
+                nx, ny = x+dx, y+dy
+                if 0 <= nx < self.width and 0 <= ny < self.height:
+                    if not visited[ny][nx] and self.labirynth[ny][nx] not in (1,2):
+                        visited[ny][nx] = True
+                        prev[ny][nx] = (x, y)
+                        queue.append((nx, ny))
+        return None  # No path found
+    
 
 if __name__ == "__main__":
-    # zbierz argumenty z linii poleceń
-    if len(sys.argv) < 3:
-        print("Usage: python level2.py <hearts> <difficulty>")
-        sys.exit(1)
-    hearts = int(sys.argv[1])
-    difficulty = sys.argv[2]
+    # If arguments are provided, use them; otherwise, use defaults
+    if len(sys.argv) >= 3:
+        hearts = int(sys.argv[1])
+        difficulty = sys.argv[2]
+    else:
+        hearts = 5
+        difficulty = "medium"
     root = tk.Tk()
     Desert(root, hearts, difficulty)
     root.mainloop()

@@ -307,13 +307,13 @@ class LabirynthGame:
         new_x, new_y = self.player_x, self.player_y
         previous_x, previous_y = self.player_x, self.player_y
 
-        if event.keysym in ("w", "Up", "W"):
+        if event.keysym in ("Up"):
             new_y -= 1
-        elif event.keysym in ("s", "Down", "S"):
+        elif event.keysym in ("Down"):
             new_y += 1
-        elif event.keysym in ("a", "Left", "A"):
+        elif event.keysym in ("Left"):
             new_x -= 1
-        elif event.keysym in ("d", "Right", "D"):
+        elif event.keysym in ("Right"):
             new_x += 1
 
         if 0 <= new_x < self.width and 0 <= new_y < self.height: #blokada ścian
