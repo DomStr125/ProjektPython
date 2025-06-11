@@ -28,7 +28,7 @@ class Desert:
             "enemy_speed": 1,
             "enemy_vision": 5,
             "day_turns": 15,
-            "night_turns": 5,
+            "night_turns": 10,
             "shift": 8,
             "quick_sand": 0.2
         },
@@ -40,7 +40,7 @@ class Desert:
             "enemy_speed": 2,
             "enemy_vision": 5,
             "day_turns": 10,
-            "night_turns": 10,
+            "night_turns": 15,
             "shift": 6,
             "quick_sand": 0.3
         }
@@ -63,6 +63,9 @@ class Desert:
         self.start_time = time.time()
         self.game_time = 0
         self.is_game_active = True
+        self.last_player_cell = 0
+        self.has_torch = False
+        self.has_sandals = False
 
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
@@ -85,12 +88,18 @@ class Desert:
 
         self.setup_scores()
 
+        self._is_day = True
+        self.day_turns = self.settings["day_turns"]
+        self.night_turns = self.settings["night_turns"]
+        self.day_night_counter = 0
+
         self.textures = self.load_textures()
 
         self.generate_labirynth()  # Generate the labyrinth on startup
         self.draw_labirynth()
 
         self.root.bind("<KeyPress>", self.on_key_press)
+
 
     def load_textures(self):
         textures = {
@@ -102,7 +111,8 @@ class Desert:
             "darkness": tk.PhotoImage(file="grafika/desert/darkness.png"),
             "quick_sand": tk.PhotoImage(file="grafika/desert/quick_sand.png"),
             "tornado": tk.PhotoImage(file="grafika/desert/tornado.png"),
-            "exit": tk.PhotoImage(file="grafika/exit.png")
+            "exit": tk.PhotoImage(file="grafika/exit.png"),
+            "torch": tk.PhotoImage(file="grafika/forest/torch.png")
         }
         return textures
 
@@ -174,6 +184,41 @@ class Desert:
                 labirynth[y][x] = 3  # 3 = quick sand
                 placed += 1
 
+        # Place vultures randomly (avoid player, exit, quicksand, and too close to other vultures)
+        self.vultures = []
+        placed = 0
+        min_dist = self.settings["enemy_vision"] + 2
+        while placed < self.enemies:
+            x = random.randint(1, self.width - 2)
+            y = random.randint(1, self.height - 2)
+            if (labirynth[y][x] == 0 and
+                (x, y) not in [(self.player_x, self.player_y), (self.exit_x, self.exit_y)] and
+                # Ensure not too close to other vultures
+                all(abs(x - vx) + abs(y - vy) >= min_dist for vx, vy, *_ in self.vultures)):
+                self.vultures.append([x, y, x, y])  # [current_x, current_y, vision_center_x, vision_center_y]
+                placed += 1
+
+        # Place torch randomly (avoid player, exit, quicksand, vultures)
+        while True:
+            x = random.randint(1, self.width - 2)
+            y = random.randint(1, self.height - 2)
+            if (labirynth[y][x] == 0 and
+                (x, y) not in [(self.player_x, self.player_y), (self.exit_x, self.exit_y)] and
+                all((x, y) != (vx, vy) for vx, vy, *_ in self.vultures)):
+                self.torch_pos = (x, y)
+                break
+
+        # Place sandals randomly (avoid player, exit, quicksand, vultures, torch)
+        while True:
+            x = random.randint(1, self.width - 2)
+            y = random.randint(1, self.height - 2)
+            if (labirynth[y][x] == 0 and
+                (x, y) not in [(self.player_x, self.player_y), (self.exit_x, self.exit_y)] and
+                (not hasattr(self, "torch_pos") or (x, y) != self.torch_pos) and
+                all((x, y) != (vx, vy) for vx, vy, *_ in self.vultures)):
+                self.sandals_pos = (x, y)
+                break
+
         self.labirynth = labirynth
 
     def tornado_shift(self):
@@ -230,29 +275,46 @@ class Desert:
         self.labirynth = labirynth
 
     def next_turn(self):
-        # Call this every player move
         self.turns += 1
+
+        # Day/night rotation
+        self.day_night_counter += 1
+        if self.is_day and self.day_night_counter >= self.day_turns:
+            self.is_day = False
+            self.day_night_counter = 0
+        elif not self.is_day and self.day_night_counter >= self.night_turns:
+            self.is_day = True
+            self.day_night_counter = 0
+
         if self.turns % self.settings["shift"] == 0:
             self.tornado_shift()
             self.draw_labirynth()
     
     def draw_labirynth(self):
-        # Create canvas if it doesn't exist
         if not hasattr(self, "canvas") or self.canvas is None:
             self.canvas = tk.Canvas(self.root, width=self.width * self.cell_size, height=self.height * self.cell_size, bg="white")
             self.canvas.pack(expand=True, fill=tk.BOTH)
 
         self.canvas.delete("all")
+
+        # Calculate visible area at night
+        if not self.is_day:
+            vision = self.vision + (2 if self.has_torch else 0)
+        else:
+            vision = max(self.width, self.height)  # Effectively full map
+
         for y in range(self.height):
             for x in range(self.width):
                 cell = self.labirynth[y][x]
                 px, py = x * self.cell_size, y * self.cell_size
+
+                # Draw base cell
                 if cell == 1:
-                    self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["wall"])  # rock border
+                    self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["wall"])
                 elif cell == 2:
-                    self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["tornado"])  # tornado inside
+                    self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["tornado"])
                 elif cell == 3:
-                    self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["quick_sand"])  # quick sand
+                    self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["quick_sand"])
                 elif cell == 0:
                     self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["sand"])
                 elif cell == "P":
@@ -260,9 +322,31 @@ class Desert:
                     self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["player"])
                 elif cell == "E":
                     self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["sand"])
-                    # Use an exit texture if you have one, otherwise fallback to enemy
                     exit_img = self.textures.get("exit", self.textures["enemy"])
                     self.canvas.create_image(px, py, anchor=tk.NW, image=exit_img)
+
+                # Overlay darkness at night if out of vision (use Manhattan distance)
+                if not self.is_day:
+                    if abs(x - self.player_x) + abs(y - self.player_y) > vision:
+                        self.canvas.create_image(px, py, anchor=tk.NW, image=self.textures["darkness"])
+
+        # After the cell loop, draw vultures only if visible
+        for vulture in self.vultures:
+            vx, vy, _, _ = vulture
+            if self.is_day or abs(vx - self.player_x) + abs(vy - self.player_y) <= vision:
+                self.canvas.create_image(vx * self.cell_size, vy * self.cell_size, anchor=tk.NW, image=self.textures["enemy"])
+
+        # Draw torch if not picked up and visible
+        if hasattr(self, "torch_pos") and self.torch_pos and not self.has_torch:
+            tx, ty = self.torch_pos
+            if self.is_day or abs(tx - self.player_x) + abs(ty - self.player_y) <= vision:
+                self.canvas.create_image(tx * self.cell_size, ty * self.cell_size, anchor=tk.NW, image=self.textures["torch"])
+
+        # Draw sandals if not picked up and visible
+        if hasattr(self, "sandals_pos") and self.sandals_pos and not self.has_sandals:
+            sx, sy = self.sandals_pos
+            if self.is_day or abs(sx - self.player_x) + abs(sy - self.player_y) <= vision:
+                self.canvas.create_image(sx * self.cell_size, sy * self.cell_size, anchor=tk.NW, image=self.textures["sandals"])
 
     def on_key_press(self, event):
         if self.in_quick_sand:
@@ -291,13 +375,31 @@ class Desert:
         if (0 < new_x < self.width - 1 and 0 < new_y < self.height - 1 and
             self.labirynth[new_y][new_x] != 1 and self.labirynth[new_y][new_x] != 2):
             # Check if stepping on quick sand BEFORE moving
-            stepping_on_quicksand = self.labirynth[new_y][new_x] == 3
+            stepping_on_quicksand = self.labirynth[new_y][new_x] == 3 and not self.has_sandals
 
-            # Move player
-            self.labirynth[self.player_y][self.player_x] = 0  # Clear old position
+            # --- NEW: Remember if current cell is quicksand ---
+            leaving_quicksand = False
+            if self.labirynth[self.player_y][self.player_x] == "P":
+                # Check what was under the player before (store this info somewhere if needed)
+                # But since you always set "P" on top of sand or quicksand, you can check the previous cell in the maze
+                # Let's keep a separate array to track quicksand, or just check if it was quicksand before
+                # For now, let's check if it was quicksand by storing it in a variable
+                if hasattr(self, "last_player_cell") and self.last_player_cell == 3:
+                    leaving_quicksand = True
+
+            # --- Move player ---
+            # Restore previous cell
+            if leaving_quicksand:
+                self.labirynth[self.player_y][self.player_x] = 3
+            else:
+                self.labirynth[self.player_y][self.player_x] = 0
+
+            # Store what is in the new cell before overwriting
+            self.last_player_cell = self.labirynth[new_y][new_x]
+
             self.player_x, self.player_y = new_x, new_y
             self.labirynth[self.player_y][self.player_x] = "P"
-            self.next_turn()  # Handle tornado shift if needed
+            self.next_turn()
             self.draw_labirynth()
 
             # If stepped on quick sand, set flag to skip next move
@@ -311,6 +413,33 @@ class Desert:
                 self.points += self.hearts * 250
                 messagebox.showinfo("Congratulations!", f"You've reached the exit in {final_time}s \n Your score: {self.points}")
                 self.root.after(100, self.root.destroy)
+
+        # --- NEW: Check for vulture collision AFTER moving ---
+        for vx, vy, *_ in self.vultures:
+            if (vx, vy) == (self.player_x, self.player_y):
+                self.hearts -= 1
+                self.label_hearts.config(text=f"Hearts: {self.hearts}")
+                if self.hearts <= 0:
+                    messagebox.showinfo("Game Over", "You were caught by a vulture!")
+                    self.root.after(100, self.root.destroy)
+                break
+
+        # Check for torch pickup
+        if hasattr(self, "torch_pos") and (self.player_x, self.player_y) == self.torch_pos and not self.has_torch:
+            self.has_torch = True
+            self.torch_pos = None
+            self.points += 1000
+            self.label_points.config(text=f"Punkty: {self.points}")
+
+        # Check for sandals pickup
+        if hasattr(self, "sandals_pos") and (self.player_x, self.player_y) == self.sandals_pos and not self.has_sandals:
+            self.has_sandals = True
+            self.sandals_pos = None
+            self.points += 1000
+            self.label_points.config(text=f"Punkty: {self.points}")
+
+        self.move_vultures()
+        self.draw_labirynth()
 
     def find_shortest_path(self):
         queue = deque()
@@ -339,6 +468,74 @@ class Desert:
                         queue.append((nx, ny))
         return None  # No path found
     
+    def is_in_vulture_vision(self, vulture):
+        _, _, cx, cy = vulture
+        # Reduce vulture vision by 2 at night, but not below 1
+        vision = self.settings["enemy_vision"]
+        if not self.is_day:
+            vision = max(1, vision - 2)
+        return abs(self.player_x - cx) <= vision and abs(self.player_y - cy) <= vision
+
+    def move_vultures(self):
+        for vulture in self.vultures:
+            vx, vy, cx, cy = vulture
+            vision = self.settings["enemy_vision"]
+            speed = self.settings["enemy_speed"]
+            if not self.is_day:
+                vision = max(1, vision - 2)
+            for _ in range(speed):
+                vx, vy = vulture[0], vulture[1]
+                if abs(self.player_x - cx) <= vision and abs(self.player_y - cy) <= vision:
+                    best_dx = 0
+                    best_dy = 0
+                    if self.player_x > vx:
+                        best_dx = 1
+                    elif self.player_x < vx:
+                        best_dx = -1
+                    if self.player_y > vy:
+                        best_dy = 1
+                    elif self.player_y < vy:
+                        best_dy = -1
+                    moved = False
+                    for dx, dy in [(best_dx, 0), (0, best_dy)]:
+                        nx, ny = vx + dx, vy + dy
+                        if (abs(nx - cx) <= vision and
+                            abs(ny - cy) <= vision and
+                            self.labirynth[ny][nx] in (0, 3) and
+                            (nx, ny) != (self.player_x, self.player_y) and
+                            all((nx, ny) != (ovx, ovy) for ovx, ovy, *_ in self.vultures)):
+                            vulture[0], vulture[1] = nx, ny
+                            vx, vy = nx, ny  # Update local position for next step
+                            moved = True
+                            break
+                    if not moved:
+                        break
+                else:
+                    if (vx, vy) != (cx, cy):
+                        dx = 1 if cx > vx else -1 if cx < vx else 0
+                        dy = 1 if cy > vy else -1 if cy < vy else 0
+                        moved = False
+                        for ddx, ddy in [(dx, 0), (0, dy)]:
+                            nx, ny = vx + ddx, vy + ddy
+                            if (abs(nx - cx) <= vision and
+                                abs(ny - cy) <= vision and
+                                self.labirynth[ny][nx] in (0, 3) and
+                                (nx, ny) != (self.player_x, self.player_y) and
+                                all((nx, ny) != (ovx, ovy) for ovx, ovy, *_ in self.vultures)):
+                                vulture[0], vulture[1] = nx, ny
+                                vx, vy = nx, ny  # Update local position for next step
+                                moved = True
+                                break
+                        if not moved:
+                            break
+
+    @property
+    def is_day(self):
+        return self._is_day
+
+    @is_day.setter
+    def is_day(self, value):
+        self._is_day = value
 
 if __name__ == "__main__":
     # If arguments are provided, use them; otherwise, use defaults
@@ -347,7 +544,7 @@ if __name__ == "__main__":
         difficulty = sys.argv[2]
     else:
         hearts = 5
-        difficulty = "medium"
+        difficulty = "hard"
     root = tk.Tk()
     Desert(root, hearts, difficulty)
     root.mainloop()
