@@ -11,7 +11,7 @@ class LabirynthGame:
     # Ustawienia trudności
     DIFFICULTY_SETTINGS = {                             
         "easy": {
-            "width": 30,
+            "width": 31,
             "height": 15,
             "doors": 0,
             "max_keys": 1,
@@ -20,8 +20,8 @@ class LabirynthGame:
             "vision_range": 2
         },
         "medium": {
-            "width": 40,
-            "height": 20,
+            "width": 41,
+            "height": 21,
             "doors": 3,
             "max_keys": 2,
             "hearts": 5,
@@ -29,11 +29,11 @@ class LabirynthGame:
             "vision_range": 2
         },
         "hard": {
-            "width": 50,
+            "width": 51,
             "height": 25,
             "doors": 5,
             "max_keys": 3,
-            "hearts": 3,
+            "hearts": 5,
             "enemies": 20,
             "vision_range": 2
         }
@@ -319,7 +319,7 @@ class LabirynthGame:
             cell = self.labirynth[new_y][new_x]
             # Sprawdź drzwi
             if isinstance(cell, str) and cell.startswith("D"):
-                key_type = "K" + cell[1:]  # e.g. D2 -> K2
+                key_type = "K" + cell[1:]
                 if key_type in self.keys:
                     # Otwórz drzwi
                     self.labirynth[new_y][new_x] = 0
@@ -350,8 +350,8 @@ class LabirynthGame:
         # Potwory
         if not hasattr(self, "monsters_are_visible"):
             self.monsters_are_visible = False
-            self.monster_hidden_turns = 3
-            self.monster_visible_turns = 2
+            self.monster_hidden_turns = 2
+            self.monster_visible_turns = random.randint(2, 5)
 
         if self.monsters_are_visible:
             self.monster_visible_turns -= 1
@@ -361,7 +361,7 @@ class LabirynthGame:
                     self.labirynth[y][x] = "GRASS"
                 self.grass_monsters.clear()
                 self.monsters_are_visible = False
-                self.monster_hidden_turns = 3
+                self.monster_hidden_turns = 2
         else:
             self.monster_hidden_turns -= 1
             if self.monster_hidden_turns <= 0:
@@ -370,7 +370,7 @@ class LabirynthGame:
                 for (x, y) in self.enemies:
                     self.labirynth[y][x] = "GRASS_MONSTER"
                 self.monsters_are_visible = True
-                self.monster_visible_turns = 2
+                self.monster_visible_turns = random.randint(2, 5)
 
         self.draw_labirynth()
 
@@ -679,6 +679,7 @@ class LabirynthGame:
 
     def save_game(self, filename="savegame.pkl"): # zapisywanie stanu gry
         state = {
+            "level": "forest",
             "labirynth": self.labirynth,
             "player_x": self.player_x,
             "player_y": self.player_y,
@@ -714,10 +715,8 @@ class LabirynthGame:
             pickle.dump(state, f)
         messagebox.showinfo("Game Saved", "Your game has been saved!")
 
-    def load_game(self, filename): # ładowanie stanu gry
-        if filename == "savegame2.pkl":
-            print("Loading savegame2.pkl...")
-        elif filename == "savegame.pkl":
+    def load_game(self, filename="savegame.pkl"): # ładowanie stanu gry
+
             with open(filename, "rb") as f:
                 state = pickle.load(f)
             self.labirynth = state["labirynth"]

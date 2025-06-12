@@ -496,8 +496,10 @@ class Desert:
                         if not moved:
                             break
 
-    def save_game(self, filename="savegame2.pkl"): # zapisywanie stanu gry
+    def save_game(self, filename="savegame.pkl"): # zapisywanie stanu gry
         state = {
+            "level": "desert",
+            "difficulty": self.difficulty,
             "player_x": self.player_x,
             "player_y": self.player_y,
             "exit_x": self.exit_x,
