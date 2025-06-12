@@ -55,7 +55,7 @@ KAMPANIA:
 		-> sępy (przciwnicy AI z określoną szybkością i polem widzenia) !
 		-> system dnia i nocy (w nocy ograniczona widoczność gracza i wrogów) MEDIUM (day: 0.75 / night: 0.25) HARD (day/night: 0.5) - stosunek tur (np. 30 tur dnia i 10 nocy dla medium)
 			-> HARD - większa liczba przeciwników / zwiekszenie ich statystyk (np. szybkość) !
-		-> przedmioty specjalne: pochodnia / buty (ruchome piaski działają jak zwykłe ścieżki)
+		-> przedmioty specjalne: pochodnia / buty (ruchome piaski działają jak zwykłe ścieżki) !
 	-> góry:
 		-> wielopoziomowość (np. schody, dookoła skała - można się tylko zsunąć "w dół") + (obrażenia za upadek z wysokości) 
 		-> lawiny (co kilka tur na losowo wybrane (1 raz) pola spada lawina) 

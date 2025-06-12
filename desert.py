@@ -4,6 +4,7 @@ from tkinter import messagebox
 import random
 import time
 from collections import deque
+import pickle
 
 class Desert:
     #Poziomy trudności
@@ -328,6 +329,10 @@ class Desert:
             equipment_display = ", ".join(equipment) if equipment else "None"
             messagebox.showinfo("Equipment", f"Collected equipment: {equipment_display}")
             return
+        
+        if event.keysym.lower() == "p":
+            self.save_game()
+            return
 
         if self.in_quick_sand:
             self.in_quick_sand = False
@@ -490,6 +495,27 @@ class Desert:
                                 break
                         if not moved:
                             break
+
+    def save_game(self, filename="savegame2.pkl"): # zapisywanie stanu gry
+        state = {
+            "player_x": self.player_x,
+            "player_y": self.player_y,
+            "exit_x": self.exit_x,
+            "exit_y": self.exit_y,
+            "labirynth": self.labirynth,
+            "vultures": self.vultures,
+            "has_torch": self.has_torch,
+            "has_sandals": self.has_sandals,
+            "hearts": self.hearts,
+            "points": self.points,
+            "turns": self.turns,
+            "is_day": self.is_day,
+            "day_night_counter": self.day_night_counter,
+            "start_time": self.start_time
+        }
+        with open(filename, "wb") as f:
+            pickle.dump(state, f)
+        messagebox.showinfo("Game Saved", "Your game has been saved!")
 
     @property # Właściwość do sprawdzania, czy jest dzień
     def is_day(self):

@@ -714,41 +714,44 @@ class LabirynthGame:
             pickle.dump(state, f)
         messagebox.showinfo("Game Saved", "Your game has been saved!")
 
-    def load_game(self, filename="savegame.pkl"): # ładowanie stanu gry
-        with open(filename, "rb") as f:
-            state = pickle.load(f)
-        self.labirynth = state["labirynth"]
-        self.player_x = state["player_x"]
-        self.player_y = state["player_y"]
-        self.previous_x = state["previous_x"]
-        self.previous_y = state["previous_y"]
-        self.exit_x = state["exit_x"]
-        self.exit_y = state["exit_y"]
-        self.doors = state["doors"]
-        self.keys_pos = state["keys_pos"]
-        self.keys = state["keys"]
-        self.points = state["points"]
-        self.hearts = state["hearts"]
-        self.inventory = state["inventory"]
-        self.torch_x = state["torch_x"]
-        self.torch_y = state["torch_y"]
-        self.gate_x = state.get("gate_x", -1)
-        self.gate_y = state.get("gate_y", -1)
-        self.gate_key_x = state.get("gate_key_x", -1)
-        self.gate_key_y = state.get("gate_key_y", -1)
-        self.discovered = state["discovered"]
-        self.enemies = state["enemies"]
-        self.grass_monsters = set(state["grass_monsters"])
-        self.player_moves = state["player_moves"]
-        self.monster_turns_left = state["monster_turns_left"]
-        self.monster_hidden_turns = state["monster_hidden_turns"]
-        self.monster_visible_turns = state["monster_visible_turns"]
-        self.monsters_are_visible = state["monsters_are_visible"]
-        self.game_time = state["game_time"]
-        self.start_time = state["start_time"]
-        self.difficulty = state["difficulty"]
-        self.draw_labirynth()
-        messagebox.showinfo("Game Loaded", "Your game has been loaded!")
+    def load_game(self, filename): # ładowanie stanu gry
+        if filename == "savegame2.pkl":
+            print("Loading savegame2.pkl...")
+        elif filename == "savegame.pkl":
+            with open(filename, "rb") as f:
+                state = pickle.load(f)
+            self.labirynth = state["labirynth"]
+            self.player_x = state["player_x"]
+            self.player_y = state["player_y"]
+            self.previous_x = state["previous_x"]
+            self.previous_y = state["previous_y"]
+            self.exit_x = state["exit_x"]
+            self.exit_y = state["exit_y"]
+            self.doors = state["doors"]
+            self.keys_pos = state["keys_pos"]
+            self.keys = state["keys"]
+            self.points = state["points"]
+            self.hearts = state["hearts"]
+            self.inventory = state["inventory"]
+            self.torch_x = state["torch_x"]
+            self.torch_y = state["torch_y"]
+            self.gate_x = state.get("gate_x", -1)
+            self.gate_y = state.get("gate_y", -1)
+            self.gate_key_x = state.get("gate_key_x", -1)
+            self.gate_key_y = state.get("gate_key_y", -1)
+            self.discovered = state["discovered"]
+            self.enemies = state["enemies"]
+            self.grass_monsters = set(state["grass_monsters"])
+            self.player_moves = state["player_moves"]
+            self.monster_turns_left = state["monster_turns_left"]
+            self.monster_hidden_turns = state["monster_hidden_turns"]
+            self.monster_visible_turns = state["monster_visible_turns"]
+            self.monsters_are_visible = state["monsters_are_visible"]
+            self.game_time = state["game_time"]
+            self.start_time = state["start_time"]
+            self.difficulty = state["difficulty"]
+            self.draw_labirynth()
+            messagebox.showinfo("Game Loaded", "Your game has been loaded!")
 
     @staticmethod
     def start_game_with_difficulty(root, difficulty): # uruchomienie gry z wybranym poziomem trudności
